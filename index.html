@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACE Bot — AskDataAi_CTL</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1d21; color: #d1d2d3; height: 100vh; display: flex; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    .sidebar { width: 260px; background: #19171d; border-right: 1px solid #3f3f3f; display: flex; flex-direction: column; flex-shrink: 0; }
+    .workspace-header { padding: 16px; border-bottom: 1px solid #3f3f3f; }
+    .workspace-name { font-size: 15px; font-weight: 700; color: #fff; }
+    .workspace-status { font-size: 12px; color: #ababad; margin-top: 4px; display: flex; align-items: center; gap: 5px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #2bac76; flex-shrink: 0; }
+    .nav-section { padding: 16px 8px 8px; }
+    .nav-label { font-size: 11px; font-weight: 700; color: #ababad; text-transform: uppercase; letter-spacing: 0.5px; padding: 0 8px 8px; }
+    .nav-item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 14px; color: #ababad; transition: background 0.1s; user-select: none; }
+    .nav-item:hover { background: #2c2d30; color: #d1d2d3; }
+    .nav-item.active { background: #1164a3; color: #fff; }
+    .nav-hash { font-size: 15px; opacity: 0.7; }
+    .apps-item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 14px; color: #36c5f0; }
+    .app-icon { width: 20px; height: 20px; border-radius: 4px; background: #1164a3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
+
+    /* ── Main chat ── */
+    .chat-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .chat-header { padding: 12px 20px; border-bottom: 1px solid #3f3f3f; display: flex; align-items: center; gap: 8px; background: #1a1d21; flex-shrink: 0; }
+    .chat-header-hash { font-size: 18px; color: #ababad; }
+    .chat-header-name { font-size: 15px; font-weight: 700; color: #fff; }
+    .chat-header-sep { color: #3f3f3f; margin: 0 4px; }
+    .chat-header-hint { font-size: 12px; color: #ababad; }
+    .chat-header-hint code { background: #2c2d30; padding: 1px 5px; border-radius: 3px; }
+
+    /* ── Messages ── */
+    .messages { flex: 1; overflow-y: auto; padding: 16px 20px 8px; display: flex; flex-direction: column; gap: 2px; }
+    .messages::-webkit-scrollbar { width: 8px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: #3f3f3f; border-radius: 4px; }
+
+    .msg { display: flex; gap: 10px; padding: 4px 8px; border-radius: 4px; }
+    .msg:hover { background: #222529; }
+    .avatar { width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
+    .av-user { background: #4a154b; }
+    .av-bot  { background: #1164a3; }
+    .av-sys  { background: #2bac76; }
+    .msg-body { flex: 1; min-width: 0; }
+    .msg-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+    .msg-author { font-size: 14px; font-weight: 700; color: #fff; }
+    .msg-author.ace { color: #36c5f0; }
+    .app-badge { background: #1164a3; color: #fff; font-size: 10px; padding: 1px 4px; border-radius: 3px; font-weight: 600; }
+    .msg-time { font-size: 11px; color: #ababad; }
+    .msg-text { font-size: 14px; line-height: 1.6; color: #d1d2d3; }
+    .msg-text code { background: #2c2d30; padding: 1px 5px; border-radius: 3px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; color: #e8912d; }
+    .msg-text strong { color: #fff; }
+
+    .divider { height: 1px; background: #3f3f3f; margin: 14px 0; position: relative; flex-shrink: 0; }
+    .divider-label { position: absolute; left: 50%; transform: translateX(-50%); top: -9px; background: #1a1d21; padding: 0 10px; font-size: 11px; color: #ababad; white-space: nowrap; }
+
+    /* ── Typing indicator ── */
+    .typing-row { display: flex; gap: 10px; padding: 4px 8px; }
+    .typing-bubble { background: #222529; border-radius: 12px; padding: 8px 12px; display: flex; align-items: center; gap: 4px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #ababad; animation: bounce 1.2s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+    .typing-label { font-size: 12px; color: #ababad; margin-bottom: 4px; }
+
+    /* ── Input ── */
+    .input-area { padding: 10px 20px 18px; flex-shrink: 0; }
+    .input-wrap { background: #222529; border: 1px solid #3f3f3f; border-radius: 8px; display: flex; align-items: center; gap: 8px; padding: 9px 12px; transition: border-color 0.15s; }
+    .input-wrap:focus-within { border-color: #1164a3; }
+    .msg-input { flex: 1; background: none; border: none; outline: none; color: #d1d2d3; font-size: 14px; font-family: inherit; }
+    .msg-input::placeholder { color: #ababad; }
+    .send-btn { background: #1164a3; border: none; border-radius: 4px; padding: 6px 14px; color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; transition: background 0.15s; white-space: nowrap; }
+    .send-btn:hover { background: #0f52a4; }
+    .send-btn:disabled { background: #3f3f3f; cursor: default; color: #7a7b7d; }
+    .input-hint { font-size: 11px; color: #5e5f61; margin-top: 5px; text-align: center; }
+
+    /* ── CTL Card ── */
+    .ctl-card { background: #222529; border: 1px solid #3f3f3f; border-left: 4px solid #1164a3; border-radius: 6px; padding: 16px 18px; margin-top: 8px; max-width: 680px; }
+    .ctl-card-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .ctl-card-title { font-size: 16px; font-weight: 700; color: #fff; }
+    .pill { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .pill-blue  { background: #0d1f33; color: #36c5f0; border: 1px solid #1164a3; }
+    .pill-green { background: #0d2218; color: #2bac76; border: 1px solid #1d6040; }
+
+    .sec { margin-bottom: 14px; }
+    .sec:last-child { margin-bottom: 0; }
+    .sec-title { font-size: 10px; font-weight: 700; color: #ababad; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 7px; display: flex; align-items: center; gap: 8px; }
+    .sec-title::after { content: ''; flex: 1; height: 1px; background: #3f3f3f; }
+    .sec-body { font-size: 13px; line-height: 1.65; color: #d1d2d3; }
+    .sec-body strong { color: #fff; }
+
+    .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { padding: 2px 9px; border-radius: 10px; font-size: 12px; }
+    .tag-red    { background: #2a0d1a; color: #e01e5a; border: 1px solid #cd2553; }
+    .tag-yellow { background: #2a1a00; color: #e8912d; border: 1px solid #b06a1f; }
+    .tag-blue   { background: #0d1f33; color: #36c5f0; border: 1px solid #1164a3; }
+
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 6px; }
+    .stat { background: #2c2d30; border-radius: 6px; padding: 8px 10px; }
+    .stat-label { font-size: 10px; color: #ababad; text-transform: uppercase; letter-spacing: 0.3px; }
+    .stat-val { font-size: 17px; font-weight: 700; margin-top: 2px; }
+    .val-green  { color: #2bac76; }
+    .val-gold   { color: #f5a623; }
+
+    .tl { list-style: none; padding: 0; }
+    .tl li { padding: 6px 0 6px 18px; border-left: 2px solid #3f3f3f; position: relative; font-size: 13px; color: #d1d2d3; line-height: 1.55; }
+    .tl li::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #1164a3; position: absolute; left: -5px; top: 11px; }
+    .tl li:last-child { border-left-color: transparent; }
+    .tl-step { font-size: 10px; font-weight: 700; color: #ababad; text-transform: uppercase; letter-spacing: 0.4px; display: block; margin-bottom: 2px; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .sub-card { background: #2c2d30; border-radius: 6px; padding: 10px 12px; }
+    .sub-card-title { font-size: 11px; font-weight: 700; color: #ababad; margin-bottom: 5px; }
+    .sub-card-body { font-size: 12px; color: #d1d2d3; line-height: 1.55; }
+    .sub-card-body strong { color: #fff; }
+
+    .rec-list { list-style: none; padding: 0; }
+    .rec-list li { padding: 5px 0 5px 18px; position: relative; font-size: 13px; color: #d1d2d3; line-height: 1.55; }
+    .rec-list li::before { content: '→'; position: absolute; left: 0; color: #1164a3; font-weight: 700; }
+    .rec-list li strong { color: #fff; }
+
+    /* Single-section card (smaller) */
+    .mini-card { background: #222529; border: 1px solid #3f3f3f; border-left: 4px solid #1164a3; border-radius: 6px; padding: 14px 16px; margin-top: 8px; max-width: 620px; }
+    .mini-title { font-size: 13px; font-weight: 700; color: #ababad; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+<!-- ── SIDEBAR ── -->
+<div class="sidebar">
+  <div class="workspace-header">
+    <div class="workspace-name">DoorDash Internal</div>
+    <div class="workspace-status"><div class="status-dot"></div> You</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Channels</div>
+    <div class="nav-item"><span class="nav-hash">#</span> general</div>
+    <div class="nav-item"><span class="nav-hash">#</span> ace-team</div>
+    <div class="nav-item active"><span class="nav-hash">#</span> AskDataAi_CTL</div>
+    <div class="nav-item"><span class="nav-hash">#</span> escalations</div>
+    <div class="nav-item"><span class="nav-hash">#</span> safety-reviews</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Apps</div>
+    <div class="apps-item">
+      <div class="app-icon">ACE</div>
+      ACE Bot
+    </div>
+  </div>
+</div>
+
+<!-- ── CHAT AREA ── -->
+<div class="chat-area">
+  <div class="chat-header">
+    <span class="chat-header-hash">#</span>
+    <span class="chat-header-name">AskDataAi_CTL</span>
+    <span class="chat-header-sep">·</span>
+    <span class="chat-header-hint">Try: <code>Provide CTL for case 123</code> or <code>root cause for case 123</code></span>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="divider"><span class="divider-label">Today</span></div>
+
+    <!-- Welcome -->
+    <div class="msg">
+      <div class="avatar av-bot">ACE</div>
+      <div class="msg-body">
+        <div class="msg-meta">
+          <span class="msg-author ace">ACE</span>
+          <span class="app-badge">APP</span>
+          <span class="msg-time" id="welcomeTime"></span>
+        </div>
+        <div class="msg-text">
+          Hey! I'm <strong>ACE</strong>, your Close the Loop assistant.<br><br>
+          Ask me about any case using natural language. Examples:<br>
+          <code>Provide CTL for case 123</code><br>
+          <code>Give me the background for case 123</code><br>
+          <code>What's the root cause for case 123?</code><br>
+          <code>Show me agent performance for case 123</code><br>
+          <code>What are the recommendations for case 123?</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-wrap">
+      <input class="msg-input" id="msgInput" type="text" placeholder="Message #AskDataAi_CTL" autocomplete="off" />
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+    </div>
+    <div class="input-hint">Press Enter to send</div>
+  </div>
+</div>
+
+<script>
+  // ── Utilities ──────────────────────────────────────────────
+  const messagesEl = document.getElementById('messages');
+  const input = document.getElementById('msgInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  document.getElementById('welcomeTime').textContent = getTime();
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  function getTime() {
+    return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function append(html) {
+    messagesEl.insertAdjacentHTML('beforeend', html);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // ── Send ───────────────────────────────────────────────────
+  function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    sendBtn.disabled = true;
+
+    const t = getTime();
+    append(`
+      <div class="msg">
+        <div class="avatar av-user">YOU</div>
+        <div class="msg-body">
+          <div class="msg-meta"><span class="msg-author">You</span><span class="msg-time">${t}</span></div>
+          <div class="msg-text">${escHtml(text)}</div>
+        </div>
+      </div>`);
+
+    const lower = text.toLowerCase();
+
+    // Detect case number (any digits)
+    const caseMatch = lower.match(/case\s+(\w+)/i) || lower.match(/(\d{3,})/);
+    const caseNum = caseMatch ? caseMatch[1] : null;
+
+    // Detect which section is being asked for
+    const section = detectSection(lower);
+
+    // Show typing then respond
+    showTyping(section, caseNum, text);
+  }
+
+  // ── Section detection ──────────────────────────────────────
+  function detectSection(q) {
+    if (/full\s+ctl|provide\s+ctl|complete\s+ctl|all\s+(of\s+)?(the\s+)?ctl|full\s+report|everything/.test(q)) return 'full';
+    if (/tldr|tl;?dr|summary|overview/.test(q)) return 'tldr';
+    if (/background|dasher\s+info|dasher\s+profile|who\s+is/.test(q)) return 'background';
+    if (/root\s+cause|what\s+caused|why\s+was|reason/.test(q)) return 'rootcause';
+    if (/ace\s+(case\s+)?summary|ace\s+review|core\s+issue|outcome|resolution|bgc/.test(q)) return 'ace';
+    if (/agent\s+perf|how\s+(did|was).*agent|agent.*perform|kevin|support\s+agent/.test(q)) return 'agentperf';
+    if (/support\s+hist|case\s+1|case\s+2|consumer|nina|dasher\s+case|contact/.test(q)) return 'support';
+    if (/rec|next\s+step|action\s+item|what\s+should|follow.up/.test(q)) return 'recommendations';
+    if (/issue\s+tag|tag|label/.test(q)) return 'tags';
+    // numbered sections  (e.g. "section 2", "2. root cause", "number 3")
+    const numMatch = q.match(/(?:section\s+|number\s+|#\s*)?(\d)\s*[\.\-:]?\s*(root cause|core issue|agent|outcome|conclusion|summary|background|recommendation)?/);
+    if (numMatch) {
+      const n = parseInt(numMatch[1]);
+      const map = { 1:'ace_core', 2:'rootcause', 3:'agentperf', 4:'ace', 5:'ace_outcome', 6:'ace_conclusion' };
+      if (map[n]) return map[n];
+    }
+    // Default: full CTL
+    return 'full';
+  }
+
+  // ── Typing indicator ───────────────────────────────────────
+  function showTyping(section, caseNum, originalText) {
+    const id = 'typing-' + Date.now();
+    append(`
+      <div class="typing-row" id="${id}">
+        <div class="avatar av-bot">ACE</div>
+        <div>
+          <div class="typing-label">ACE is compiling case data…</div>
+          <div class="typing-bubble"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+        </div>
+      </div>`);
+
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+      renderResponse(section, caseNum, originalText);
+      sendBtn.disabled = false;
+    }, 1800);
+  }
+
+  // ── Response router ────────────────────────────────────────
+  function renderResponse(section, caseNum, originalText) {
+    const t = getTime();
+    const cn = caseNum || '???';
+
+    switch (section) {
+      case 'tldr':          append(msgWrap(t, sectionTLDR(cn))); break;
+      case 'background':    append(msgWrap(t, sectionBackground(cn))); break;
+      case 'rootcause':     append(msgWrap(t, sectionRootCause(cn))); break;
+      case 'ace':           append(msgWrap(t, sectionACE(cn))); break;
+      case 'ace_core':      append(msgWrap(t, sectionACECore(cn))); break;
+      case 'ace_outcome':   append(msgWrap(t, sectionACEOutcome(cn))); break;
+      case 'ace_conclusion':append(msgWrap(t, sectionACEConclusion(cn))); break;
+      case 'agentperf':     append(msgWrap(t, sectionAgentPerf(cn))); break;
+      case 'support':       append(msgWrap(t, sectionSupport(cn))); break;
+      case 'recommendations': append(msgWrap(t, sectionRecommendations(cn))); break;
+      case 'tags':          append(msgWrap(t, sectionTags(cn))); break;
+      default:              append(msgWrap(t, fullCTL(cn))); break;
+    }
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // ── Message wrapper ────────────────────────────────────────
+  function msgWrap(t, cardHtml) {
+    return `
+      <div class="msg">
+        <div class="avatar av-bot">ACE</div>
+        <div class="msg-body">
+          <div class="msg-meta">
+            <span class="msg-author ace">ACE</span>
+            <span class="app-badge">APP</span>
+            <span class="msg-time">${t}</span>
+          </div>
+          ${cardHtml}
+        </div>
+      </div>`;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // SECTION BUILDERS
+  // ══════════════════════════════════════════════════════════
+
+  function sectionTLDR(cn) {
+    return `
+      <div class="msg-text">Here's the <strong>TLDR</strong> for Case <strong>${cn}</strong>:</div>
+      <div class="mini-card">
+        <div class="mini-title">TLDR — Case ${cn}</div>
+        <div class="sec-body">
+          Gold Dasher with <strong>3.3 years</strong> of tenure was deactivated for alleged intoxication and inappropriate conduct.
+          The Dasher did not receive the deactivation notice due to an <strong>outdated email</strong>.
+          After ACE review and a clear background check, the account was <strong>reactivated</strong> due to no previous related incidents.
+          Support agents followed policy, but communicated in an unclear manner.
+        </div>
+      </div>`;
+  }
+
+  function sectionBackground(cn) {
+    return `
+      <div class="msg-text">Here's the <strong>Dasher Background</strong> for Case <strong>${cn}</strong>:</div>
+      <div class="mini-card">
+        <div class="mini-title">Dasher Background</div>
+        <div class="sec-body" style="margin-bottom:10px;">
+          <strong>John Jones</strong> &nbsp;·&nbsp; <span style="color:#f5a623;">⭐ Gold Dasher</span><br>
+          Joined <strong>Nov 25, 2022</strong> &nbsp;·&nbsp; <strong>3.3 years</strong> tenure &nbsp;·&nbsp; Exceeds all eligibility requirements
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="stat-label">L30D Deliveries</div><div class="stat-val val-green">250</div></div>
+          <div class="stat"><div class="stat-label">Acceptance Rate</div><div class="stat-val val-green">95%</div></div>
+          <div class="stat"><div class="stat-label">Completion Rate</div><div class="stat-val val-green">95%</div></div>
+          <div class="stat"><div class="stat-label">Customer Rating</div><div class="stat-val val-green">100%</div></div>
+          <div class="stat"><div class="stat-label">On-Time Rating</div><div class="stat-val val-green">98%</div></div>
+          <div class="stat"><div class="stat-label">Segment</div><div class="stat-val val-gold">Gold</div></div>
+        </div>
+      </div>`;
+  }
+
+  function sectionRootCause(cn) {
+    return `
+      <div class="msg-text">Here's the <strong>Root Cause</strong> for Case <strong>${cn}</strong>:</div>
+      <div class="mini-card">
+        <div class="mini-title">2. Root Cause</div>
+        <div class="sec-body" style="margin-bottom:10px;">
+          Investigation revealed <strong>John Jones</strong> was deactivated due to allegations of being under the influence,
+          making inappropriate comments, and rushing staff. There were three previous unrelated warnings,
+          although not reflected in the DIR history. <strong>Mairon's email was not updated</strong>, causing the
+          deactivation notice to be sent to an unmonitored inbox.
+        </div>
+        <div class="tag-row">
+          <div class="tag tag-yellow">Dasher Error · Alleged Intoxication</div>
+          <div class="tag tag-yellow">Dasher Error · Outdated Email</div>
+          <div class="tag tag-blue">Policy · Deactivation Transparency</div>
+        </div>
+      </div>`;
+  }
+
+  function sectionACECore(cn) {
+    return `
+      <div class="msg-text">Here's the <strong>Core Issue</strong> (Section 1) for Case <strong>${cn}</strong>:</div>
+      <div class="mini-card">
+        <div class="mini-title">1. Core Issue</div>
+        <div class="sec-body">
+          John Jones' DoorDash account was deactivated for a safety violation, preventing him from Dashing.
+          He contacted support and was informed of the deactivation, but reports <strong>not receiving any prior email notification</strong>.
+          The case was escalated to the ACE team for review.
+        </div>
+      </div>`;
+  }
+
+  function sectionACEOutcome(cn) {
+    return `
+      <div class="msg-text">Here's the <strong>Outcome</strong> (Section 5) for Case <strong>${cn}</strong>:</div>
+      <div class="mini-card">
+        <div class="mini-title">5. Outcome</div>
+        <div class="sec-body">
+          Account cleared pending reactivation upon completion of a background check (BGC).
+          The BGC came back <strong style="color:#2bac76;">clear</strong>, and the Dasher was
+          <strong style="color:#2bac76;">reactivated</strong> based on no previous DIRs.
+        </div>
+      </div>`;
+  }
+
+  function sectionACEConclusion(cn) {
+    return `
+      <div class="msg-text">Here's the <strong>Conclusion</strong> (Section 6) for Case <strong>${cn}</strong>:</div>
+      <div class="mini-card">
+        <div class="mini-title">6. Conclusion</div>
+        <div class="sec-body">
+          The primary issue of account deactivation was resolved through a thorough investigation and
+          reactivation upon a clear background check. The agent handled the escalation professionally,
+          and the operational friction was managed through appropriate transfers and multiple contacts.
+        </div>
+      </div>`;
+  }
+
+  function sectionACE(cn) {
+    return `
+      <div class="msg-text">Here's the <strong>ACE Case Summary</strong> for Case <strong>${cn}</strong>:</div>
+      <div class="mini-card">
+        <div class="mini-title">ACE Case Summary — Case ${cn}</div>
+        <ul class="tl">
+          <li><span class="tl-step">1. Core Issue</span>Account deactivated for a safety violation. Dasher contacted support and reported not receiving prior email notification. Case escalated to ACE team.</li>
+          <li><span class="tl-step">2. Root Cause</span>Alleged intoxication, inappropriate comments, and rushing staff. Three prior unrelated warnings (not in DIR). Outdated email caused notification failure.</li>
+          <li><span class="tl-step">3. Agent Performance</span>Agent <strong>Kevin Cole</strong> communicated clearly, gathered required details, and escalated to HSL team. Final outcome email sent per policy.</li>
+          <li><span class="tl-step">5. Outcome</span>BGC came back <strong style="color:#2bac76;">clear</strong> → Dasher <strong style="color:#2bac76;">reactivated</strong> based on no previous DIRs.</li>
+          <li><span class="tl-step">6. Conclusion</span>Deactivation resolved through thorough investigation. Agent handled escalation professionally; friction managed through appropriate transfers.</li>
+        </ul>
+      </div>`;
+  }
+
+  function sectionAgentPerf(cn) {
+    return `
+      <div class="msg-text">Here's the <strong>Agent Performance</strong> summary for Case <strong>${cn}</strong>:</div>
+      <div class="mini-card">
+        <div class="mini-title">Agent Performance</div>
+        <div class="two-col">
+          <div class="sub-card">
+            <div class="sub-card-title">Case 1 — Consumer Agent</div>
+            <div class="sub-card-body">
+              Communicated clearly and attempted to de-escalate. Took ownership of the block and compensation review.
+              <br><br>
+              <strong>Gaps:</strong> Occasionally interrupted customer; no clear timeline for resolution; vague on compensation process.
+            </div>
+          </div>
+          <div class="sub-card">
+            <div class="sub-card-title">Case 2 — Dasher Agent</div>
+            <div class="sub-card-body">
+              Provided a clear timeline with next steps and attempted to reassure the Dasher.
+              <br><br>
+              <strong>Gaps:</strong> Fragmented communication; no escalation options offered; did not address prior conflicting assurances.
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <div class="sub-card">
+            <div class="sub-card-title">ACE Agent — Kevin Cole</div>
+            <div class="sub-card-body">Communicated clearly and professionally, took ownership, gathered required details, and appropriately escalated to HSL team. Final outcome email sent in accordance with policy. ✓</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function sectionSupport(cn) {
+    return `
+      <div class="msg-text">Here's the <strong>Support History</strong> for Case <strong>${cn}</strong>:</div>
+      <div class="mini-card">
+        <div class="mini-title">Support History — 2 Cases</div>
+        <div class="sec-body" style="margin-bottom:10px;">
+          Two separate support cases were created for this incident. The first was created by the consumer who reported the Dasher. The Dasher was subsequently deactivated and then contacted support.
+        </div>
+        <div class="two-col">
+          <div class="sub-card">
+            <div class="sub-card-title">📦 Support Case 1 — Consumer</div>
+            <div class="sub-card-body">
+              <strong>Customer:</strong> Nina Rodriguez<br>
+              <strong>Issue:</strong> Reported feeling uncomfortable due to driver inappropriate behavior during a delivery to Corner Bakery Cafe.<br>
+              <strong>Outcome:</strong> Driver blocked; compensation review initiated. Email with final decision to be sent to store.<br>
+              <strong>Agent Note:</strong> Clear communication, but lacked timeline and specifics on compensation.
+            </div>
+          </div>
+          <div class="sub-card">
+            <div class="sub-card-title">🚗 Support Case 2 — Dasher</div>
+            <div class="sub-card-body">
+              <strong>Dasher:</strong> John Jones<br>
+              <strong>Issue:</strong> Requested update on safety deactivation appeal filed 48hrs prior.<br>
+              <strong>Outcome:</strong> Advised to wait 10 business days for appeal update.<br>
+              <strong>Agent Note:</strong> Fragmented communication; no escalation options offered.
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function sectionRecommendations(cn) {
+    return `
+      <div class="msg-text">Here are the <strong>Recommendations & Next Steps</strong> for Case <strong>${cn}</strong>:</div>
+      <div class="mini-card">
+        <div class="mini-title">Recommendations & Next Steps</div>
+        <ul class="rec-list">
+          <li><strong>Validate the Safety Deactivation Decision:</strong> Ensure the original deactivation met evidence and policy standards.</li>
+          <li><strong>Audit Notification Failure:</strong> Determine if this was true Dasher negligence or a systemic communication gap.</li>
+          <li><strong>Agent Performance Review:</strong> Review corresponding workflow guidance to ensure agents have adequate explanations to provide Dashers.</li>
+        </ul>
+      </div>`;
+  }
+
+  function sectionTags(cn) {
+    return `
+      <div class="msg-text">Here are the <strong>Issue & Root Cause Tags</strong> for Case <strong>${cn}</strong>:</div>
+      <div class="mini-card">
+        <div class="mini-title">Tags — Case ${cn}</div>
+        <div style="margin-bottom:10px;">
+          <div style="font-size:11px;color:#ababad;margin-bottom:5px;">ISSUE TAGS</div>
+          <div class="tag-row">
+            <div class="tag tag-red">Safety Deactivation</div>
+            <div class="tag tag-red">Under the Influence</div>
+            <div class="tag tag-red">Inappropriate Conduct</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#ababad;margin-bottom:5px;">ROOT CAUSE TAGS</div>
+          <div class="tag-row">
+            <div class="tag tag-yellow">Dasher Error · Alleged Intoxication</div>
+            <div class="tag tag-yellow">Dasher Error · Outdated Email</div>
+            <div class="tag tag-blue">Policy · Deactivation Transparency</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ── Full CTL card ──────────────────────────────────────────
+  function fullCTL(cn) {
+    return `
+      <div class="msg-text">Here's the full <strong>Close the Loop</strong> for Case <strong>${cn}</strong>:</div>
+      <div class="ctl-card">
+
+        <!-- Header -->
+        <div class="ctl-card-header">
+          <div class="ctl-card-title">Close the Loop — Case ${cn}</div>
+          <div class="pill pill-blue">#CAS-2024-000${cn}</div>
+          <div class="pill pill-green">✓ Resolved</div>
+        </div>
+
+        <!-- TLDR -->
+        <div class="sec">
+          <div class="sec-title">TLDR</div>
+          <div class="sec-body">
+            Gold Dasher with <strong>3.3 years</strong> of tenure was deactivated for alleged intoxication and inappropriate conduct.
+            The Dasher did not receive the deactivation notice due to an <strong>outdated email</strong>.
+            After ACE review and a clear background check, the account was <strong>reactivated</strong> due to no previous related incidents.
+            Support agents followed policy, but communicated in an unclear manner.
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div class="sec">
+          <div class="sec-title">Issue Tags</div>
+          <div class="tag-row">
+            <div class="tag tag-red">Safety Deactivation</div>
+            <div class="tag tag-red">Under the Influence</div>
+            <div class="tag tag-red">Inappropriate Conduct</div>
+          </div>
+          <div style="margin-top:8px;">
+            <div style="font-size:10px;color:#ababad;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:5px;">Root Cause Tags</div>
+            <div class="tag-row">
+              <div class="tag tag-yellow">Dasher Error · Alleged Intoxication</div>
+              <div class="tag tag-yellow">Dasher Error · Outdated Email</div>
+              <div class="tag tag-blue">Policy · Deactivation Transparency</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dasher Background -->
+        <div class="sec">
+          <div class="sec-title">Dasher Background</div>
+          <div class="sec-body" style="margin-bottom:8px;">
+            <strong>John Jones</strong> &nbsp;·&nbsp; <span style="color:#f5a623;">⭐ Gold Dasher</span> &nbsp;·&nbsp; Joined <strong>Nov 25, 2022</strong> &nbsp;·&nbsp; <strong>3.3 yrs</strong> tenure
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="stat-label">L30D Deliveries</div><div class="stat-val val-green">250</div></div>
+            <div class="stat"><div class="stat-label">Acceptance Rate</div><div class="stat-val val-green">95%</div></div>
+            <div class="stat"><div class="stat-label">Completion Rate</div><div class="stat-val val-green">95%</div></div>
+            <div class="stat"><div class="stat-label">Customer Rating</div><div class="stat-val val-green">100%</div></div>
+            <div class="stat"><div class="stat-label">On-Time Rating</div><div class="stat-val val-green">98%</div></div>
+            <div class="stat"><div class="stat-label">Segment</div><div class="stat-val val-gold">Gold</div></div>
+          </div>
+        </div>
+
+        <!-- ACE Summary -->
+        <div class="sec">
+          <div class="sec-title">ACE Case Summary</div>
+          <ul class="tl">
+            <li><span class="tl-step">1. Core Issue</span>Account deactivated for a safety violation. Dasher contacted support and reported not receiving prior email notification. Case escalated to ACE team for review.</li>
+            <li><span class="tl-step">2. Root Cause</span>Alleged intoxication, inappropriate comments, and rushing staff. Three prior unrelated warnings (not in DIR). Outdated email caused notification failure.</li>
+            <li><span class="tl-step">3. Agent Performance</span>Agent <strong>Kevin Cole</strong> communicated clearly, gathered required details, and escalated to HSL team. Final outcome email sent per policy.</li>
+            <li><span class="tl-step">5. Outcome</span>Account cleared pending BGC → BGC came back <strong style="color:#2bac76;">clear</strong> → Dasher <strong style="color:#2bac76;">reactivated</strong> based on no previous DIRs.</li>
+            <li><span class="tl-step">6. Conclusion</span>Deactivation resolved through thorough investigation. Agent handled escalation professionally; friction managed through appropriate transfers.</li>
+          </ul>
+        </div>
+
+        <!-- Support History -->
+        <div class="sec">
+          <div class="sec-title">Support History (2 Cases)</div>
+          <div class="two-col">
+            <div class="sub-card">
+              <div class="sub-card-title">📦 Case 1 — Consumer (Nina Rodriguez)</div>
+              <div class="sub-card-body">
+                <strong>Issue:</strong> Inappropriate driver behavior at Corner Bakery Cafe.<br>
+                <strong>Outcome:</strong> Driver blocked; compensation review initiated.<br>
+                <strong>Agent Note:</strong> Clear comms but lacked timeline and compensation specifics.
+              </div>
+            </div>
+            <div class="sub-card">
+              <div class="sub-card-title">🚗 Case 2 — Dasher (John Jones)</div>
+              <div class="sub-card-body">
+                <strong>Issue:</strong> Requested update on appeal filed 48hrs prior.<br>
+                <strong>Outcome:</strong> Advised to wait 10 business days.<br>
+                <strong>Agent Note:</strong> Fragmented comms; no escalation options offered.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="sec">
+          <div class="sec-title">Recommendations & Next Steps</div>
+          <ul class="rec-list">
+            <li><strong>Validate Deactivation:</strong> Ensure original decision met evidence and policy standards.</li>
+            <li><strong>Audit Notification Failure:</strong> Determine if Dasher negligence or systemic communication gap.</li>
+            <li><strong>Agent Coaching:</strong> Review workflow guidance so agents provide clearer explanations to Dashers.</li>
+          </ul>
+        </div>
+
+      </div>`;
+  }
+</script>
+</body>
+</html>
